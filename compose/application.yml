@@ -1,0 +1,144 @@
+# The application, assembled from immutable image digests.
+#
+# Every service image comes from an environment variable that `scripts/manifest.mjs env` renders
+# from a release manifest, so this file never decides which version runs. Tier-2 services sit behind
+# the `liveness` profile: they have no behaviour to test yet, only a health endpoint to answer.
+name: cosmic-arcana
+
+services:
+  tarot-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: tarot
+      POSTGRES_PASSWORD: tarot
+      POSTGRES_DB: tarot
+    ports: ['5433:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tarot -d tarot']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  history-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: history
+      POSTGRES_PASSWORD: history
+      POSTGRES_DB: history
+    ports: ['5434:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U history -d history']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    command: ['redis-server', '--maxmemory-policy', 'noeviction']
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  tarot-service-api:
+    image: ${TAROT_SERVICE_API_IMAGE}
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: log
+      HTTP_PORT: 3004
+      DATABASE_URL: postgres://tarot:tarot@tarot-db:5432/tarot
+      DATABASE_RUN_MIGRATIONS: 'true'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      OUTBOX_RELAY_ENABLED: 'true'
+      # Validation waits on this loop, so poll faster than the 1s default.
+      OUTBOX_POLL_INTERVAL_MS: 250
+    ports: ['3004:3004']
+    depends_on:
+      tarot-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:3004/health/ready']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  history-service-api:
+    image: ${HISTORY_SERVICE_API_IMAGE}
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: log
+      HTTP_PORT: 3005
+      DATABASE_URL: postgres://history:history@history-db:5432/history
+      DATABASE_RUN_MIGRATIONS: 'true'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TAROT_SERVICE_URL: http://tarot-service-api:3004
+      TAROT_SERVICE_TIMEOUT_MS: 3000
+    ports: ['3005:3005']
+    depends_on:
+      history-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      tarot-service-api: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:3005/health/ready']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  ai-service-api:
+    image: ${AI_SERVICE_API_IMAGE:-ghcr.io/cosmic-arcana/ai-service-api:development}
+    profiles: [liveness]
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: log
+      HTTP_PORT: 3001
+      TCP_HOST: 0.0.0.0
+      TCP_PORT: 4001
+      NASA_SERVICE_TCP_HOST: nasa-service-api
+      NASA_SERVICE_TCP_PORT: 4002
+    ports: ['3001:3001']
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:3001/health/live']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  nasa-service-api:
+    image: ${NASA_SERVICE_API_IMAGE:-ghcr.io/cosmic-arcana/nasa-service-api:development}
+    profiles: [liveness]
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: log
+      HTTP_PORT: 3002
+      TCP_HOST: 0.0.0.0
+      TCP_PORT: 4002
+      NASA_API_BASE_URL: https://api.nasa.gov
+      NASA_API_KEY: ${NASA_API_KEY:-DEMO_KEY}
+    ports: ['3002:3002']
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:3002/health/live']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  mcp-service-api:
+    image: ${MCP_SERVICE_API_IMAGE:-ghcr.io/cosmic-arcana/mcp-service-api:development}
+    profiles: [liveness]
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+    ports: ['3003:3003']
+    healthcheck:
+      # This service has no health module yet; its root route is the only liveness signal.
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:3003/']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s

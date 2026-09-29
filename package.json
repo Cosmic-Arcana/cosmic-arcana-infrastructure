@@ -1,0 +1,17 @@
+{
+  "name": "cosmic-arcana-infrastructure",
+  "version": "0.1.0",
+  "description": "Application release manifests, application-level validation and shared CI workflows",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "manifest": "node scripts/manifest.mjs",
+    "validate:health": "node scripts/validate-health.mjs",
+    "validate:contract": "node scripts/validate-contract.mjs",
+    "validate:integration": "node scripts/validate-integration.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  }
+}

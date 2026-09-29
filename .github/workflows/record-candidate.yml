@@ -1,0 +1,116 @@
+name: Record candidate manifest
+
+# Cheap, serialized writer. Every service that publishes an image lands here, and the candidate
+# manifest ends up holding the newest digest of every service. Because recording is never cancelled,
+# a later validation run can safely cancel an earlier one without losing anybody's change.
+
+on:
+  repository_dispatch:
+    types: [service-updated, contract-published]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service name, as it appears in the manifest
+        required: true
+        type: string
+      repository:
+        description: Owner/repo the image was built from
+        required: true
+        type: string
+      image:
+        description: Image reference without the digest
+        required: true
+        type: string
+      digest:
+        description: sha256:...
+        required: true
+        type: string
+      commit:
+        description: Commit the image was built from
+        required: true
+        type: string
+      tier:
+        description: flow participates in the application flow, liveness only answers health
+        default: liveness
+        type: choice
+        options: [flow, liveness]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manifest-candidate-development
+  cancel-in-progress: false
+
+env:
+  CANDIDATE: manifests/development.candidate.yml
+
+jobs:
+  record:
+    name: record ${{ github.event.client_payload.service || inputs.service || 'contract' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Re-applies the change onto the newest main on every attempt instead of rebasing a commit,
+      # so two concurrent recordings can never conflict or lose each other's digest.
+      - name: Record and commit the candidate
+        env:
+          EVENT: ${{ github.event.action || 'manual' }}
+          SERVICE: ${{ github.event.client_payload.service || inputs.service }}
+          REPOSITORY: ${{ github.event.client_payload.repository || inputs.repository }}
+          IMAGE: ${{ github.event.client_payload.image || inputs.image }}
+          DIGEST: ${{ github.event.client_payload.digest || inputs.digest }}
+          COMMIT: ${{ github.event.client_payload.commit || inputs.commit }}
+          TIER: ${{ github.event.client_payload.tier || inputs.tier }}
+          CONTRACT_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          apply_change() {
+            if [ "$EVENT" = 'contract-published' ]; then
+              node scripts/manifest.mjs set-contract --file "$CANDIDATE" --version "$CONTRACT_VERSION"
+              message="[candidate]: pin @cosmic-arcana/sdk ${CONTRACT_VERSION}"
+            else
+              node scripts/manifest.mjs set-service \
+                --file "$CANDIDATE" --service "$SERVICE" --repository "$REPOSITORY" \
+                --image "$IMAGE" --digest "$DIGEST" --commit "$COMMIT" --tier "$TIER"
+              message="[candidate]: ${SERVICE} ${DIGEST}"
+            fi
+          }
+
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git reset --quiet --hard origin/main
+            apply_change
+            git add "$CANDIDATE"
+            if git diff --cached --quiet; then
+              echo 'candidate already up to date'
+              break
+            fi
+            git commit --quiet -m "$message"
+            if git push --quiet origin HEAD:main; then
+              echo "recorded on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" = '5' ]; then
+              echo '::error::could not commit the candidate manifest after 5 attempts'
+              exit 1
+            fi
+            echo "push rejected, retrying (attempt $attempt)"
+          done
+
+          node scripts/manifest.mjs show --file "$CANDIDATE" >> "$GITHUB_STEP_SUMMARY"

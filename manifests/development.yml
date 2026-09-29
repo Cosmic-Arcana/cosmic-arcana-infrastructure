@@ -1,0 +1,9 @@
+# Known-good application release for the development channel.
+# Written only by the promote job of application-validation.yml. Never edit by hand.
+version: 1
+channel: development
+generatedAt: '2026-09-24T00:00:00.000Z'
+validatedBy: null
+contracts:
+  '@cosmic-arcana/sdk': 0.1.1
+services: {}

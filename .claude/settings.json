@@ -1,0 +1,18 @@
+{
+  "model": "claude-sonnet-4.8",
+  "effortLevel": "xhigh",
+  "statusLine": {
+    "type": "command",
+    "command": "jq -r '\"[\\(.model.display_name)] \\(.context_window.used_percentage // 0)% context\"'",
+    "padding": 2
+  },
+  "spinnerTipsEnabled": false,
+  "preferredNotifChannel": "terminal_bell",
+  "permissions": {
+    "allow": [
+      "Bash(git diff *)",
+      "Read(~/.zshrc)"
+    ]
+  },
+  "autoUpdatesChannel": "stable"
+}

@@ -1,0 +1,284 @@
+name: Application validation
+
+# Starts the whole application from one release manifest and proves it still works. The changed
+# service arrives as a new digest in the candidate manifest; every other service is reused by digest,
+# never rebuilt. A green run promotes the candidate to the known-good manifest and releases it.
+
+on:
+  workflow_run:
+    workflows: ['Record candidate manifest']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      debounce-seconds:
+        description: Seconds to wait before starting, so a burst of commits collapses into one run.
+        default: '45'
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE: manifests/development.candidate.yml
+  KNOWN_GOOD: manifests/development.yml
+  COMPOSE: compose/application.yml
+  CHANNEL: development
+
+jobs:
+  debounce:
+    name: debounce
+    # workflow_run fires for every recording, including failed ones; only act on success.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: application-validation-development-debounce
+      cancel-in-progress: true
+    steps:
+      - name: Let a burst of dispatches settle
+        run: sleep ${{ inputs.debounce-seconds || '45' }}
+
+  prepare:
+    name: prepare manifest
+    needs: debounce
+    runs-on: ubuntu-latest
+    concurrency:
+      group: application-validation-development-prepare
+      cancel-in-progress: true
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+      flow-services: ${{ steps.read.outputs.flow }}
+      liveness-services: ${{ steps.read.outputs.liveness }}
+      contract: ${{ steps.read.outputs.contract }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read the candidate manifest
+        id: read
+        run: |
+          set -euo pipefail
+          flow=$(node scripts/manifest.mjs services --file "$CANDIDATE" --tier flow)
+          liveness=$(node scripts/manifest.mjs services --file "$CANDIDATE" --tier liveness)
+          if [ -z "$flow" ]; then
+            echo "::error::$CANDIDATE lists no tier-1 services; nothing to validate"
+            exit 1
+          fi
+          {
+            echo "matrix=$(node scripts/manifest.mjs matrix --file "$CANDIDATE")"
+            echo "flow=$flow"
+            echo "liveness=$liveness"
+            echo "contract=$(node scripts/manifest.mjs contract --file "$CANDIDATE")"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### candidate under validation"
+            echo ''
+            echo '```'
+            node scripts/manifest.mjs show --file "$CANDIDATE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The artifact, not the branch, is what the rest of the run uses: the branch can move while
+      # validation is running, and the result must describe exactly one manifest.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-manifest
+          path: ${{ env.CANDIDATE }}
+          retention-days: 14
+
+  resolve:
+    name: resolve ${{ matrix.service }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    concurrency:
+      group: application-validation-development-resolve-${{ matrix.service }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: The digest exists and is pullable
+        run: |
+          set -euo pipefail
+          echo "service: ${{ matrix.service }} (${{ matrix.tier }})"
+          echo "commit:  ${{ matrix.commit }}"
+          echo "image:   ${{ matrix.image }}"
+          docker buildx imagetools inspect '${{ matrix.image }}' > /dev/null
+          echo "- \`${{ matrix.service }}\` → \`${{ matrix.image }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    name: ${{ matrix.suite }}
+    needs: [prepare, resolve]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [health, contract, integration]
+    concurrency:
+      group: application-validation-development-${{ matrix.suite }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-manifest
+          path: manifests
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # The contract version in the manifest is a tag in the sdk repository, which is what the
+      # services themselves resolve. The suite therefore parses with the exact same bytes.
+      - name: Install the pinned contract package
+        if: matrix.suite == 'contract'
+        run: npm install --no-save "github:Cosmic-Arcana/cosmic-arcana-sdk#v${{ needs.prepare.outputs.contract }}"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start the application from the manifest
+        run: |
+          set -euo pipefail
+          node scripts/manifest.mjs env --file "$CANDIDATE" --out compose/.env
+          echo '--- image references in use'
+          cat compose/.env
+          profile=''
+          if [ -n '${{ needs.prepare.outputs.liveness-services }}' ]; then
+            profile='--profile liveness'
+          fi
+          # shellcheck disable=SC2086
+          docker compose -f "$COMPOSE" --env-file compose/.env $profile up -d --wait --wait-timeout 240 \
+            ${{ needs.prepare.outputs.flow-services }} ${{ needs.prepare.outputs.liveness-services }}
+          docker compose -f "$COMPOSE" --env-file compose/.env ps
+
+      - name: Run the ${{ matrix.suite }} suite
+        run: node scripts/validate-${{ matrix.suite }}.mjs "$CANDIDATE"
+
+      - name: Collect diagnostics
+        if: failure()
+        run: |
+          mkdir -p diagnostics
+          docker compose -f "$COMPOSE" --env-file compose/.env ps > diagnostics/ps.txt 2>&1 || true
+          docker compose -f "$COMPOSE" --env-file compose/.env logs --no-color --timestamps \
+            > diagnostics/logs.txt 2>&1 || true
+          cp "$CANDIDATE" diagnostics/ || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostics-${{ matrix.suite }}
+          path: diagnostics
+          retention-days: 14
+
+      - name: Stop the application
+        if: always()
+        run: docker compose -f "$COMPOSE" --env-file compose/.env down -v --remove-orphans || true
+
+  promote:
+    name: promote and release
+    needs: [prepare, validate]
+    runs-on: ubuntu-latest
+    # A release must never be cancelled halfway: a newer validation simply waits its turn.
+    concurrency:
+      group: application-release-development
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-manifest
+          path: validated
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Promote the validated manifest
+        id: promote
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          run_url='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git reset --quiet --hard origin/main
+            node scripts/manifest.mjs promote \
+              --from "validated/$(basename "$CANDIDATE")" --to "$KNOWN_GOOD" --run-url "$run_url"
+            git add "$KNOWN_GOOD"
+            if git diff --cached --quiet; then
+              echo 'known-good manifest already matches the validated set'
+              echo "released=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git commit --quiet -m "[release]: promote validated application manifest"
+            if git push --quiet origin HEAD:main; then
+              break
+            fi
+            if [ "$attempt" = '5' ]; then
+              echo '::error::could not promote the manifest after 5 attempts'
+              exit 1
+            fi
+          done
+
+          tag="app-$(date -u +%Y%m%d-%H%M)-$(git rev-parse --short HEAD)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "released=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the application release
+        if: steps.promote.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.promote.outputs.tag }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Application release for the \`${CHANNEL}\` channel."
+            echo ''
+            echo 'Validated by '"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ''
+            echo '```'
+            node scripts/manifest.mjs show --file "$KNOWN_GOOD"
+            echo '```'
+          } > release-notes.md
+          gh release create "$TAG" "$KNOWN_GOOD" --title "$TAG" --notes-file release-notes.md
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"

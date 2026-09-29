@@ -1,0 +1,92 @@
+name: Deploy application release
+
+# Deployment is manifest-driven: you pick a release, not a commit. The release tag resolves to the
+# exact digests that were validated together, which is also what makes a rollback trivial — deploy
+# the previous tag.
+#
+# There is no deployment target yet, so the final step resolves and prints the manifest instead of
+# applying it. Everything around it (approval gate, concurrency, provenance) is real, so wiring a
+# target later is one step, not a redesign.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Application release tag, for example app-20260924-0912-1a2b3c4. Empty uses the current known-good manifest.
+        default: ''
+        type: string
+      environment:
+        description: Target environment
+        default: staging
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never cancel a deployment because another one was requested; queue it instead.
+  group: application-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Resolve the release manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          if [ -n "$RELEASE" ]; then
+            gh release download "$RELEASE" --pattern 'development.yml' --output release-manifest.yml
+            echo "deploying release $RELEASE"
+          else
+            cp manifests/development.yml release-manifest.yml
+            echo 'deploying the current known-good manifest'
+          fi
+          {
+            echo "### ${{ inputs.environment }} ← ${RELEASE:-known-good}"
+            echo ''
+            echo '```'
+            node scripts/manifest.mjs show --file release-manifest.yml
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify every digest is still pullable
+        run: |
+          set -euo pipefail
+          for service in $(node scripts/manifest.mjs services --file release-manifest.yml); do
+            image=$(node scripts/manifest.mjs image --file release-manifest.yml --service "$service")
+            echo "checking $service -> $image"
+            docker buildx imagetools inspect "$image" > /dev/null
+          done
+
+      - name: Apply
+        run: |
+          echo '::notice::No deployment target is configured yet.'
+          echo 'The manifest above is the complete, immutable description of what would be deployed.'
+          echo 'Wire the target here: it consumes release-manifest.yml and nothing else.'

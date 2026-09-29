@@ -1,0 +1,207 @@
+name: Service CI
+
+# One pipeline for every Cosmic Arcana service. Repositories call it with `workflow_call` and pass
+# only what differs, so the pipeline is changed in one place instead of seven.
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Name of the service; also the GHCR image name and the manifest key.
+        required: true
+        type: string
+      tier:
+        description: flow (participates in the application flow) or liveness (starts and answers health).
+        default: liveness
+        type: string
+      node-version:
+        default: '22'
+        type: string
+      ref:
+        description: Branch to check out. Empty means the ref that triggered the run.
+        default: ''
+        type: string
+      lint-command:
+        description: Lint command. Empty string skips the step.
+        default: npm run lint
+        type: string
+      build-command:
+        default: npm run build
+        type: string
+      test-command:
+        description: Unit test command. Empty string skips the step.
+        default: npm test
+        type: string
+      e2e-command:
+        description: End-to-end command that needs a docker daemon. Empty string skips the step.
+        default: ''
+        type: string
+      build-image:
+        description: Build and publish an image on pushes to development and main.
+        default: false
+        type: boolean
+      dispatch:
+        description: Tell the infrastructure repository about the new image.
+        default: true
+        type: boolean
+    secrets:
+      INFRA_DISPATCH_TOKEN:
+        description: Fine-grained token allowed to dispatch to cosmic-arcana-infrastructure only.
+        required: false
+    outputs:
+      image-ref:
+        description: Immutable image reference, empty when no image was built.
+        value: ${{ jobs.image.outputs.image-ref }}
+      image-digest:
+        value: ${{ jobs.image.outputs.digest }}
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  verify:
+    name: verify ${{ inputs.service-name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The repositories' lint scripts pass --fix; on an ephemeral checkout that only means
+      # auto-fixable findings are silently repaired, while anything else still fails the job.
+      - name: Lint
+        if: inputs.lint-command != ''
+        run: ${{ inputs.lint-command }}
+
+      - name: Build
+        run: ${{ inputs.build-command }}
+
+      - name: Unit tests
+        if: inputs.test-command != ''
+        run: ${{ inputs.test-command }}
+
+      - name: End-to-end tests
+        if: inputs.e2e-command != ''
+        run: ${{ inputs.e2e-command }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ inputs.service-name }}"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| commit | \`$(git rev-parse HEAD)\` |"
+            echo "| ref | \`${{ inputs.ref || github.ref_name }}\` |"
+            echo "| node | ${{ inputs.node-version }} |"
+            echo "| unit tests | ${{ inputs.test-command || 'skipped' }} |"
+            echo "| e2e tests | ${{ inputs.e2e-command || 'skipped' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  image:
+    name: image ${{ inputs.service-name }}
+    # Never on pull requests: a fork must not be able to publish an image or reach a secret.
+    if: >-
+      inputs.build-image && github.event_name != 'pull_request' &&
+      (inputs.ref != '' || github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image-ref: ${{ steps.reference.outputs.ref }}
+      commit: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # A scheduled rebuild checks out a branch that is not github.ref, so provenance has to come
+      # from the working tree rather than from the event.
+      - name: Resolve the built commit
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "branch=${{ inputs.ref || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # Moving tags are for humans; orchestration always uses the digest below.
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.service-name }}:sha-${{ steps.commit.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.commit.outputs.branch }}
+          cache-from: type=gha,scope=${{ inputs.service-name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
+          provenance: false
+
+      - name: Immutable reference
+        id: reference
+        run: |
+          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          ref="${REGISTRY}/${owner}/${{ inputs.service-name }}@${{ steps.build.outputs.digest }}"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          {
+            echo "### image"
+            echo ""
+            echo "\`$ref\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dispatch:
+    name: notify infrastructure
+    if: inputs.dispatch
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch service-updated
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          IMAGE_REF: ${{ needs.image.outputs.image-ref }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+          COMMIT: ${{ needs.image.outputs.commit }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::INFRA_DISPATCH_TOKEN is not set; the application manifest was not updated"
+            exit 0
+          fi
+          image="${IMAGE_REF%@*}"
+          jq -n \
+            --arg service '${{ inputs.service-name }}' \
+            --arg repository '${{ github.repository }}' \
+            --arg image "$image" \
+            --arg digest "$DIGEST" \
+            --arg commit "$COMMIT" \
+            --arg tier '${{ inputs.tier }}' \
+            --arg run '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}' \
+            '{event_type: "service-updated", client_payload: {service: $service, repository: $repository, image: $image, digest: $digest, commit: $commit, tier: $tier, run: $run}}' \
+          | gh api --method POST /repos/${{ github.repository_owner }}/cosmic-arcana-infrastructure/dispatches --input -
+          echo "dispatched $image@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
