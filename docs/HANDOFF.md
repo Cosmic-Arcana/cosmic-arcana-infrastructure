@@ -29,7 +29,7 @@ Node 22. npm. One repository per service, all under the `Cosmic-Arcana` GitHub o
 | `ai-service-api` | predictions, tarot interpretation | 3001 / tcp 4001 | tarot domain only (75 tests); no transport, no LLM call |
 | `nasa-service-api` | NASA data | 3002 / tcp 4002 | **scaffold only**, no domain code (21 tests, all generic) |
 | `cosmic-arcana-storefront` | frontend + BFF | 3000 | default page + the new `/agent` dashboard |
-| `cosmic-arcana-infrastructure` | CI/CD, release manifests, app validation | — | **local only, not on GitHub yet** |
+| `cosmic-arcana-infrastructure` | CI/CD, release manifests, app validation | — | https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure |
 
 **What works end to end right now** (verified by running it): create a spread in `tarot-service-api` →
 outbox row in the same transaction → relay publishes `spread.created` to BullMQ → `history-service-api`
@@ -139,9 +139,9 @@ reading history has a mock adapter. No tarot or prediction semantics were invent
 Ordered by dependency. `F` foundation (first), `S` services, `X` product/UX, `H` hygiene.
 Status: ✅ done · 🟡 partial · ⬜ not started · ❌ abandoned.
 
-### F1 — Commit and push the CI/CD system ⬜
-Why: every caller needs the reusable workflow on `main` of a repo that is not on GitHub yet. Files: all
-of `cosmic-arcana-infrastructure/` (git-initialised locally; only this document is committed).
+### F1 — Commit and push the CI/CD system ✅
+Why: every caller needs the reusable workflow on `main`. Done 2026-09-29:
+https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure (`f806057`). Still open: F6 token, F8 protection.
 Depends on: —. Acceptance: Given the repo exists on GitHub, When a caller runs, Then `service-ci.yml`
 resolves and the run reaches the image job.
 
