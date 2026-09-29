@@ -148,6 +148,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # GHCR repository names must be lowercase; github.repository_owner is Cosmic-Arcana.
+      - name: Lowercase GHCR owner
+        id: ghcr
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         id: build
         uses: docker/build-push-action@v6
@@ -156,8 +161,8 @@ jobs:
           push: true
           # Moving tags are for humans; orchestration always uses the digest below.
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.service-name }}:sha-${{ steps.commit.outputs.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ inputs.service-name }}:${{ steps.commit.outputs.branch }}
+            ${{ env.REGISTRY }}/${{ steps.ghcr.outputs.owner }}/${{ inputs.service-name }}:sha-${{ steps.commit.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ steps.ghcr.outputs.owner }}/${{ inputs.service-name }}:${{ steps.commit.outputs.branch }}
           cache-from: type=gha,scope=${{ inputs.service-name }}
           cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
           provenance: false
@@ -165,8 +170,7 @@ jobs:
       - name: Immutable reference
         id: reference
         run: |
-          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
-          ref="${REGISTRY}/${owner}/${{ inputs.service-name }}@${{ steps.build.outputs.digest }}"
+          ref="${REGISTRY}/${{ steps.ghcr.outputs.owner }}/${{ inputs.service-name }}@${{ steps.build.outputs.digest }}"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
           {
             echo "### image"
