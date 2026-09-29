@@ -1,9 +1,22 @@
-# Known-good application release for the development channel.
-# Written only by the promote job of application-validation.yml. Never edit by hand.
 version: 1
 channel: development
-generatedAt: '2026-09-24T00:00:00.000Z'
-validatedBy: null
+generatedAt: 2026-09-29T17:21:12.325Z
+validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/36613263700
 contracts:
-  '@cosmic-arcana/sdk': 0.1.1
-services: {}
+  "@cosmic-arcana/sdk": 0.1.1
+services:
+  history-service-api:
+    repository: Cosmic-Arcana/history-service-api
+    image: ghcr.io/cosmic-arcana/history-service-api
+    digest: sha256:d71723c81b37ac4c02241cb9e9b8937a146d481d4ff933ec409e56f5aec45332
+    commit: 7a6d0d5af19f8508c14ab36457643701104e7d98
+    tier: flow
+    updatedAt: 2026-09-29T17:20:56.830Z
+  tarot-service-api:
+    repository: Cosmic-Arcana/tarot-service-api
+    image: ghcr.io/cosmic-arcana/tarot-service-api
+    digest: sha256:e0066de09a65f5487f3cedb1df03cc22f571989d0c82c78ca89ef68446d6d53e
+    commit: dddb66efc321693859ed33b70f52a4107db7eb27
+    tier: flow
+    updatedAt: 2026-09-29T17:21:12.325Z
+promotedAt: 2026-09-29T18:38:37.230Z
