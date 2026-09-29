@@ -1,7 +1,7 @@
 version: 1
 channel: development
 generatedAt: 2026-09-29T21:19:05.967Z
-validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/36632369391
+validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/36632464410
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
 services:
@@ -19,4 +19,4 @@ services:
     commit: 4b9d30b66d15be197569a0c4cb069a3de40ade3c
     tier: flow
     updatedAt: 2026-09-29T21:19:05.966Z
-promotedAt: 2026-09-29T21:20:36.300Z
+promotedAt: 2026-09-29T21:21:29.329Z
