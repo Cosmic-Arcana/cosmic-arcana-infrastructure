@@ -167,16 +167,23 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
           provenance: false
 
-      # Images default to private. Application validation runs in this repo and cannot
-      # read another repository's GHCR package with its own GITHUB_TOKEN (403 read_package).
-      - name: Publish the GHCR package
+      # GHCR packages start private. Org-wide Actions read lets application-validation
+      # in cosmic-arcana-infrastructure pull with its GITHUB_TOKEN. The /visibility
+      # route 404s for these packages (Actions token), so it is best-effort.
+      - name: Allow org Actions to pull the image
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          name='${{ inputs.service-name }}'
+          org='${{ github.repository_owner }}'
           gh api --method PUT \
-            "/orgs/${{ github.repository_owner }}/packages/container/${{ inputs.service-name }}/visibility" \
-            -f visibility=public
+            "/orgs/${org}/packages/container/${name}/action/permissions" \
+            -f access=organization \
+            || gh api --method PUT \
+            "/orgs/${org}/packages/container/${name}/permissions/repositories/cosmic-arcana-infrastructure" \
+            -f permission=read \
+            || echo "::warning::could not grant GHCR Actions access for ${name}"
 
       - name: Immutable reference
         id: reference
