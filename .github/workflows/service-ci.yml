@@ -167,6 +167,17 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
           provenance: false
 
+      # Images default to private. Application validation runs in this repo and cannot
+      # read another repository's GHCR package with its own GITHUB_TOKEN (403 read_package).
+      - name: Publish the GHCR package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api --method PUT \
+            "/orgs/${{ github.repository_owner }}/packages/container/${{ inputs.service-name }}/visibility" \
+            -f visibility=public
+
       - name: Immutable reference
         id: reference
         run: |
