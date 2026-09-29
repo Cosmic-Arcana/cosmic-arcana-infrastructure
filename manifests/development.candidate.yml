@@ -1,6 +1,6 @@
 version: 1
 channel: development
-generatedAt: 2026-09-29T21:18:14.809Z
+generatedAt: 2026-09-29T21:19:05.967Z
 validatedBy: null
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
@@ -15,7 +15,7 @@ services:
   tarot-service-api:
     repository: Cosmic-Arcana/tarot-service-api
     image: ghcr.io/cosmic-arcana/tarot-service-api
-    digest: sha256:e0066de09a65f5487f3cedb1df03cc22f571989d0c82c78ca89ef68446d6d53e
-    commit: dddb66efc321693859ed33b70f52a4107db7eb27
+    digest: sha256:fc316224d9e0e6526584179fb34da3a3e3f49639498deb4ac2a28e2098e5698a
+    commit: 4b9d30b66d15be197569a0c4cb069a3de40ade3c
     tier: flow
-    updatedAt: 2026-09-29T17:21:12.325Z
+    updatedAt: 2026-09-29T21:19:05.966Z
