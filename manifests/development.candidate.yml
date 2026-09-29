@@ -1,9 +1,7 @@
-# Newest known state of every service, written by record-candidate.yml on each service-updated
-# dispatch. This is what application validation runs; on success it is promoted to development.yml.
 version: 1
 channel: development
-generatedAt: '2026-09-24T00:00:00.000Z'
+generatedAt: 2026-09-29T15:34:36.410Z
 validatedBy: null
 contracts:
-  '@cosmic-arcana/sdk': 0.1.1
+  "@cosmic-arcana/sdk": 0.1.1
 services: {}
