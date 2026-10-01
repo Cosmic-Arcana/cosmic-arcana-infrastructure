@@ -1,0 +1,24 @@
+# Load-run overlay for application.yml: locally built images, and tarot draws through the real
+# ai-service-api over TCP instead of its stub generator. The interpreter stays on its stub, so a
+# run of any size makes no Anthropic calls.
+#
+#   docker compose -f compose/application.yml -f compose/load.yml up -d \
+#     tarot-service-api history-service-api ai-service-api
+services:
+  tarot-service-api:
+    image: ${TAROT_SERVICE_API_IMAGE:-cosmic-arcana/tarot-service-api:load}
+    environment:
+      SPREAD_GENERATOR: ai-service
+      AI_SERVICE_TCP_HOST: ai-service-api
+      AI_SERVICE_TCP_PORT: 4001
+    depends_on:
+      ai-service-api: { condition: service_healthy }
+
+  history-service-api:
+    image: ${HISTORY_SERVICE_API_IMAGE:-cosmic-arcana/history-service-api:load}
+
+  ai-service-api:
+    image: ${AI_SERVICE_API_IMAGE:-cosmic-arcana/ai-service-api:load}
+    profiles: !reset []
+    environment:
+      AI_INTERPRETER: stub
