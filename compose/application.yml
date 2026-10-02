@@ -91,7 +91,10 @@ services:
       start_period: 5s
 
   cosmic-arcana-storefront:
-    image: ${COSMIC_ARCANA_STOREFRONT_IMAGE}
+    # Compose rejects a blank image for the whole project, even for a service nobody starts, and
+    # this one is not in every manifest. The default is a valid reference that fails when pulled,
+    # so starting the storefront without a manifest entry fails loudly instead of pulling a moving tag.
+    image: ${COSMIC_ARCANA_STOREFRONT_IMAGE:-ghcr.io/cosmic-arcana/cosmic-arcana-storefront:missing-from-manifest}
     environment:
       # Everything the storefront reads is runtime configuration, except the browser's websocket
       # address, which is baked into the image when it is built.

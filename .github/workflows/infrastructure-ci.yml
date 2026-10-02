@@ -47,3 +47,12 @@ jobs:
         run: |
           docker compose -f compose/application.yml config --quiet
           docker compose -f compose/application.yml -f compose/e2e-ci.yml config --quiet
+
+      # A service that is not in the manifest has no image variable, and compose rejects the whole
+      # project over a blank image even for a service nobody starts. Validation ran like this, with
+      # only the services that were already in the manifest, before the storefront joined it.
+      - name: Compose is valid with only the services a manifest already has
+        env:
+          TAROT_SERVICE_API_IMAGE: x
+          HISTORY_SERVICE_API_IMAGE: x
+        run: docker compose -f compose/application.yml config --quiet
