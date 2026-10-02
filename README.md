@@ -7,6 +7,9 @@
 Owns what no single service can own: the shared CI pipeline, the application release manifest, and
 the validation that answers one question —
 
+This org is **vibe-coded** (Claude remote control **and** Cursor; ~$190 usage credits left after
+the hackathon).
+
 > if we run the whole application with this new version of one service and the existing versions of
 > every other, does it still work?
 
