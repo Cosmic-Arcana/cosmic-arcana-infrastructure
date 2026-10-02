@@ -1,0 +1,13 @@
+# Whole application for browser e2e. Layer it on top of load.yml, which supplies locally built
+# images, real ai-service draws and the stub interpreter. This adds nasa and mcp, which
+# application.yml keeps behind the liveness profile.
+#
+#   docker compose -f compose/application.yml -f compose/load.yml -f compose/e2e.yml up -d --wait
+services:
+  nasa-service-api:
+    image: ${NASA_SERVICE_API_IMAGE:-cosmic-arcana/nasa-service-api:load}
+    profiles: !reset []
+
+  mcp-service-api:
+    image: ${MCP_SERVICE_API_IMAGE:-cosmic-arcana/mcp-service-api:load}
+    profiles: !reset []
