@@ -13,6 +13,7 @@ commands:
   show           --file <path>
   services       --file <path> [--tier flow|liveness]
   image          --file <path> --service <name>
+  missing        --file <path> --services <a,b,c>   names not in the manifest, space separated
   matrix         --file <path>            json array for strategy.matrix
   env            --file <path> [--out <path>]
   contract       --file <path>            prints the pinned contract version
@@ -91,6 +92,19 @@ const commands = {
       throw new Error(`${service} is not listed in ${file}`);
     }
     return imageRef(entry);
+  },
+
+  missing: (args) => {
+    const [file, services] = required(args, 'file', 'services');
+    const wanted = services
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean);
+    if (wanted.length === 0) {
+      throw new Error('missing --services');
+    }
+    const present = load(file).services;
+    return wanted.filter((name) => !Object.hasOwn(present, name)).join(' ');
   },
 
   matrix: (args) => {

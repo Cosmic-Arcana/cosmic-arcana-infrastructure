@@ -90,6 +90,32 @@ services:
       retries: 20
       start_period: 5s
 
+  cosmic-arcana-storefront:
+    image: ${COSMIC_ARCANA_STOREFRONT_IMAGE}
+    environment:
+      # Everything the storefront reads is runtime configuration, except the browser's websocket
+      # address, which is baked into the image when it is built.
+      APP_BASE_URL: http://localhost:3000
+      TAROT_BASE_URL: http://tarot-service-api:3004
+      HISTORY_BASE_URL: http://history-service-api:3005
+      MCP_SERVICE_URL: http://mcp-service-api:3003
+      # Placeholders so a validation run needs no tenant; a real run supplies its own values. The
+      # secret only encrypts the session cookie of a stack that lives for one validation run.
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:-validation.invalid}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-validation-client}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:-validation-secret}
+      AUTH0_SECRET: ${AUTH0_SECRET:-validation-only-secret-validation-only-secret-validation-0001}
+    ports: ['3000:3000']
+    depends_on:
+      tarot-service-api: { condition: service_healthy }
+      history-service-api: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:3000/health/live']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
   ai-service-api:
     image: ${AI_SERVICE_API_IMAGE:-ghcr.io/cosmic-arcana/ai-service-api:development}
     profiles: [liveness]

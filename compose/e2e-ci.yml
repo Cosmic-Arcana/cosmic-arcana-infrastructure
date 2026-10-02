@@ -1,0 +1,38 @@
+# What the browser e2e job adds to application.yml. It is meant for a CI runner, where every image
+# comes from the manifest, so unlike e2e.yml it has no locally built images in it.
+#
+#   docker compose -f compose/application.yml -f compose/e2e-ci.yml up -d --wait <services>
+#
+# tarot draws through the real ai-service (the stub generator does not put the question in the
+# prediction, which the browser tests read), and the storefront reaches tarot and history through
+# the fault proxies that Playwright starts on the runner. That is how a test breaks a dependency on
+# demand: a server-side fetch cannot be intercepted from the browser.
+services:
+  tarot-service-api:
+    environment:
+      SPREAD_GENERATOR: ai-service
+      AI_SERVICE_TCP_HOST: ai-service-api
+      AI_SERVICE_TCP_PORT: 4001
+    depends_on:
+      ai-service-api: { condition: service_healthy }
+
+  ai-service-api:
+    profiles: !reset []
+    environment:
+      AI_INTERPRETER: stub
+
+  mcp-service-api:
+    profiles: !reset []
+
+  cosmic-arcana-storefront:
+    extra_hosts: ['host.docker.internal:host-gateway']
+    environment:
+      TAROT_BASE_URL: http://host.docker.internal:4004
+      HISTORY_BASE_URL: http://host.docker.internal:4005
+      # Short on purpose: the tests that make a dependency hang wait for exactly this long.
+      TAROT_TIMEOUT_MS: 1500
+      HISTORY_TIMEOUT_MS: 1500
+      # Set on purpose: the tests prove this development shortcut does nothing in a production build.
+      AGENT_DASHBOARD_DEV_USER: e2e-agent-user
+      # The tests mint session cookies with this value, so it must match theirs (e2e/support/stack.ts).
+      AUTH0_SECRET: e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0

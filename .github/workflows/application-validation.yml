@@ -204,9 +204,154 @@ jobs:
         if: always()
         run: docker compose -f "$COMPOSE" --env-file compose/.env down -v --remove-orphans || true
 
+  e2e:
+    name: browser e2e
+    needs: [prepare, resolve]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    concurrency:
+      group: application-validation-development-e2e
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      packages: read
+    env:
+      STOREFRONT: cosmic-arcana-storefront
+      # What the browser tests need running beside the storefront. tarot draws through ai-service
+      # because the stub generator does not put the question in the prediction, which the tests read.
+      REQUIRED: tarot-service-api,history-service-api,mcp-service-api,ai-service-api,cosmic-arcana-storefront
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-manifest
+          path: manifests
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Staged adoption: until the storefront has published an image and joined the manifest there is
+      # nothing to test, and the rest of the validation must keep working. From the moment it is in
+      # the manifest this job is a real gate, and a manifest that has the storefront but lacks a
+      # service it needs is an error, not a skip.
+      - name: Decide whether the storefront is part of this candidate
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ -n "$(node scripts/manifest.mjs missing --file "$CANDIDATE" --services "$STOREFRONT")" ]; then
+            echo 'applicable=false' >> "$GITHUB_OUTPUT"
+            echo "::notice::the candidate manifest has no $STOREFRONT yet, so there is no browser e2e to run"
+            echo '### browser e2e: skipped (the storefront is not in the candidate manifest yet)' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          absent=$(node scripts/manifest.mjs missing --file "$CANDIDATE" --services "$REQUIRED")
+          if [ -n "$absent" ]; then
+            echo "::error::the candidate has $STOREFRONT but not the services it needs: $absent"
+            exit 1
+          fi
+          commit=$(node scripts/manifest.mjs matrix --file "$CANDIDATE" \
+            | jq -r --arg name "$STOREFRONT" '.[] | select(.service == $name) | .commit')
+          echo 'applicable=true' >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "### browser e2e: storefront \`$commit\` against the candidate's services" >> "$GITHUB_STEP_SUMMARY"
+
+      # The tests live with the storefront and are checked out at the very commit the image was
+      # built from, so the suite and the artifact under test cannot drift apart.
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.applicable == 'true'
+        with:
+          repository: Cosmic-Arcana/cosmic-arcana-storefront
+          ref: ${{ steps.gate.outputs.commit }}
+          path: storefront
+
+      - uses: docker/login-action@v3
+        if: steps.gate.outputs.applicable == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start the application from the manifest
+        if: steps.gate.outputs.applicable == 'true'
+        run: |
+          set -euo pipefail
+          node scripts/manifest.mjs env --file "$CANDIDATE" --out compose/.env
+          cat compose/.env
+          docker compose -f "$COMPOSE" -f compose/e2e-ci.yml --env-file compose/.env up -d --wait --wait-timeout 240 \
+            tarot-service-api history-service-api ai-service-api mcp-service-api "$STOREFRONT"
+          docker compose -f "$COMPOSE" -f compose/e2e-ci.yml --env-file compose/.env ps
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.applicable == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+
+      - name: Install the storefront's test dependencies and Chromium
+        if: steps.gate.outputs.applicable == 'true'
+        working-directory: storefront
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # The same suite twice, because a development server and a production image hide different
+      # things. This run starts the storefront from source, as a developer does.
+      - name: Functional scenarios, storefront from source
+        if: steps.gate.outputs.applicable == 'true'
+        working-directory: storefront
+        run: npm run e2e
+
+      # This run tests the artifact that ships: the image from the manifest, already running. The
+      # fault proxies stay on the runner and listen beyond loopback so the container can reach them.
+      - name: Production scenarios, storefront from the image
+        if: steps.gate.outputs.applicable == 'true'
+        working-directory: storefront
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          E2E_PROXY_HOST: 0.0.0.0
+        run: npm run e2e:production
+
+      - name: Collect diagnostics
+        if: failure() && steps.gate.outputs.applicable == 'true'
+        run: |
+          mkdir -p diagnostics
+          docker compose -f "$COMPOSE" -f compose/e2e-ci.yml --env-file compose/.env ps > diagnostics/ps.txt 2>&1 || true
+          docker compose -f "$COMPOSE" -f compose/e2e-ci.yml --env-file compose/.env logs --no-color --timestamps \
+            > diagnostics/logs.txt 2>&1 || true
+          cp "$CANDIDATE" diagnostics/ || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.gate.outputs.applicable == 'true'
+        with:
+          name: diagnostics-e2e
+          path: diagnostics
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.gate.outputs.applicable == 'true'
+        with:
+          name: playwright-report
+          path: |
+            storefront/playwright-report
+            storefront/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop the application
+        if: always() && steps.gate.outputs.applicable == 'true'
+        run: docker compose -f "$COMPOSE" -f compose/e2e-ci.yml --env-file compose/.env down -v --remove-orphans || true
+
   promote:
     name: promote and release
-    needs: [prepare, validate]
+    needs: [prepare, validate, e2e]
     runs-on: ubuntu-latest
     # A release must never be cancelled halfway: a newer validation simply waits its turn.
     concurrency:

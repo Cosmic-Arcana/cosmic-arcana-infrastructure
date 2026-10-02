@@ -1,0 +1,49 @@
+name: Infrastructure CI
+
+# This repository is mostly workflows and the scripts behind them, and nothing else checks either
+# before they run for real. A workflow that is not valid fails only when it is next triggered.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infrastructure-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: scripts and workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Script tests
+        run: npm test
+
+      - name: Workflows are valid GitHub Actions
+        run: pipx run check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
+
+      - name: Compose files are valid
+        env:
+          TAROT_SERVICE_API_IMAGE: x
+          HISTORY_SERVICE_API_IMAGE: x
+          COSMIC_ARCANA_STOREFRONT_IMAGE: x
+          MCP_SERVICE_API_IMAGE: x
+          AI_SERVICE_API_IMAGE: x
+          NASA_SERVICE_API_IMAGE: x
+        run: |
+          docker compose -f compose/application.yml config --quiet
+          docker compose -f compose/application.yml -f compose/e2e-ci.yml config --quiet

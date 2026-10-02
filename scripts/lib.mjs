@@ -10,6 +10,11 @@ export const ENDPOINTS = {
     live: '/health/live',
     ready: '/health/ready',
   },
+  'cosmic-arcana-storefront': {
+    base: 'http://127.0.0.1:3000',
+    live: '/health/live',
+    ready: '/health/ready',
+  },
   'ai-service-api': { base: 'http://127.0.0.1:3001', live: '/health/live', ready: '/health/ready' },
   'nasa-service-api': { base: 'http://127.0.0.1:3002', live: '/health/live', ready: '/health/ready' },
   // No health module in this service yet; the root route is the only liveness signal it offers.
