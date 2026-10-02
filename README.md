@@ -75,6 +75,43 @@ docker compose -f compose/application.yml --env-file compose/.env down -v
 4. If it is `tier: flow`, add its endpoint to `scripts/lib.mjs` and its wiring to
    `compose/application.yml`.
 
+## Browser e2e
+
+`application-validation.yml` has an `e2e` job beside the three suites. It runs the storefront's
+Playwright suite against the candidate manifest, twice, because a development server and a
+production image hide different things:
+
+| Run | Storefront | Scenarios |
+| --- | --- | --- |
+| functional | started from source, at the commit the manifest records | ask, saved readings, dependency failures, agent feed, accessibility, phone layout |
+| production | **the image from the manifest**, already running | signed out and signed in as two users, user isolation, no accidental sign-out, strict CSP |
+
+The job is **staged**. While the candidate has no `cosmic-arcana-storefront` it passes with a notice,
+so validation keeps working as the storefront's image is being published. From the moment the
+storefront is in the manifest it is a gate that `promote` waits for, and a manifest that has the
+storefront but lacks `tarot`, `history`, `mcp` or `ai` fails with the names of what is missing
+(`node scripts/manifest.mjs missing --file <manifest> --services a,b,c`).
+
+`compose/e2e-ci.yml` is what the job adds to `compose/application.yml`: tarot draws through the real
+ai-service (the stub generator does not put the question into the prediction, which the tests read),
+and the storefront reaches tarot and history through the fault proxies Playwright starts on the
+runner, which is how a test makes a dependency fail on demand.
+
+```bash
+# the same thing locally, with the images tagged by hand instead of from a manifest
+export TAROT_SERVICE_API_IMAGE=… HISTORY_SERVICE_API_IMAGE=… MCP_SERVICE_API_IMAGE=… \
+       AI_SERVICE_API_IMAGE=… COSMIC_ARCANA_STOREFRONT_IMAGE=…
+docker compose -f compose/application.yml -f compose/e2e-ci.yml up -d --wait \
+  tarot-service-api history-service-api ai-service-api mcp-service-api cosmic-arcana-storefront
+cd ../cosmic-arcana-storefront
+npm run e2e                                                              # from source
+E2E_BASE_URL=http://localhost:3000 E2E_PROXY_HOST=0.0.0.0 npm run e2e:production   # the image
+```
+
+The storefront image bakes the browser's websocket address (`NEXT_PUBLIC_TAROT_WS_URL`) in at build
+time, defaulting to `ws://localhost:3004/live`. That suits this validation stack; a deployment
+elsewhere builds with `--build-arg`, or the storefront moves that setting to runtime first.
+
 ## Secrets
 
 | Secret | Where | Why |
