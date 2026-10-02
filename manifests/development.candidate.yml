@@ -1,6 +1,6 @@
 version: 1
 channel: development
-generatedAt: 2026-10-02T14:12:10.277Z
+generatedAt: 2026-10-02T14:13:06.846Z
 validatedBy: null
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
@@ -26,3 +26,10 @@ services:
     commit: 756a19f076b1ff1152606933b44c5f7b7edb280f
     tier: liveness
     updatedAt: 2026-10-02T14:10:25.495Z
+  mcp-service-api:
+    repository: Cosmic-Arcana/mcp-service-api
+    image: ghcr.io/cosmic-arcana/mcp-service-api
+    digest: sha256:c35f2512a8bf18e8e2bb679fbc97259d7947411c379fe43832ab05a05e02ec6d
+    commit: 00ef02f25200bcd88072e4259f25591f065aab2a
+    tier: liveness
+    updatedAt: 2026-10-02T14:13:06.845Z
