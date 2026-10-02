@@ -1,6 +1,6 @@
 version: 1
 channel: development
-generatedAt: 2026-09-30T19:56:00.044Z
+generatedAt: 2026-10-02T14:10:25.495Z
 validatedBy: null
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
@@ -25,4 +25,4 @@ services:
     digest: sha256:ce4798686d6a22097c379fb0486d695b37946d45cc95a6299fdb85347c2760a9
     commit: 756a19f076b1ff1152606933b44c5f7b7edb280f
     tier: liveness
-    updatedAt: 2026-09-30T19:55:15.090Z
+    updatedAt: 2026-10-02T14:10:25.495Z
