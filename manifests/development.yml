@@ -1,29 +1,36 @@
 version: 1
 channel: development
-generatedAt: 2026-09-30T19:56:00.044Z
-validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/36769100177
+generatedAt: 2026-10-02T14:13:06.846Z
+validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/37018608033
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
 services:
   history-service-api:
     repository: Cosmic-Arcana/history-service-api
     image: ghcr.io/cosmic-arcana/history-service-api
-    digest: sha256:1b1ada97ba073733093d55807716147151ab7841d4822489ef0fc245377eea8a
-    commit: 413269755f51beae05d044dcafaae3ffe5073b1d
+    digest: sha256:abc35d83facc0dad3488356ca889364e0814b0814b018b2bedeed1c6d3a45a0c
+    commit: 530e3635273f5762e5740078a087128ae49c9e3a
     tier: flow
-    updatedAt: 2026-09-29T21:18:14.809Z
+    updatedAt: 2026-10-02T14:12:10.277Z
   tarot-service-api:
     repository: Cosmic-Arcana/tarot-service-api
     image: ghcr.io/cosmic-arcana/tarot-service-api
-    digest: sha256:e1d7c465d9d0113888b1c9446c5651d82864e13c27378b603f2863e23c84fb34
-    commit: 15c12d8d5c264620e7dbcb5444d089f8eea93576
+    digest: sha256:ddf43d0ff38091c4a4d534e0146f028a4af63217a59a0dae8f544bacd06813dc
+    commit: 225f17c8b47201a361fb606053a64fd133d05f7b
     tier: flow
-    updatedAt: 2026-09-30T19:56:00.044Z
+    updatedAt: 2026-10-02T14:11:37.190Z
   ai-service-api:
     repository: Cosmic-Arcana/ai-service-api
     image: ghcr.io/cosmic-arcana/ai-service-api
     digest: sha256:ce4798686d6a22097c379fb0486d695b37946d45cc95a6299fdb85347c2760a9
     commit: 756a19f076b1ff1152606933b44c5f7b7edb280f
     tier: liveness
-    updatedAt: 2026-09-30T19:55:15.090Z
-promotedAt: 2026-09-30T19:58:32.339Z
+    updatedAt: 2026-10-02T14:10:25.495Z
+  mcp-service-api:
+    repository: Cosmic-Arcana/mcp-service-api
+    image: ghcr.io/cosmic-arcana/mcp-service-api
+    digest: sha256:c35f2512a8bf18e8e2bb679fbc97259d7947411c379fe43832ab05a05e02ec6d
+    commit: 00ef02f25200bcd88072e4259f25591f065aab2a
+    tier: liveness
+    updatedAt: 2026-10-02T14:13:06.845Z
+promotedAt: 2026-10-02T14:18:25.243Z
