@@ -1,6 +1,6 @@
 version: 1
 channel: development
-generatedAt: 2026-10-02T14:13:06.846Z
+generatedAt: 2026-10-02T14:25:58.325Z
 validatedBy: null
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
@@ -33,3 +33,10 @@ services:
     commit: 00ef02f25200bcd88072e4259f25591f065aab2a
     tier: liveness
     updatedAt: 2026-10-02T14:13:06.845Z
+  cosmic-arcana-storefront:
+    repository: Cosmic-Arcana/cosmic-arcana-storefront
+    image: ghcr.io/cosmic-arcana/cosmic-arcana-storefront
+    digest: sha256:f2ed53972fda2056d1fd576665cae647be9d319ec9b36abcec3d2c2233b3a268
+    commit: 94b55d64bc2b22f636a57a78bbf4a8c997827b31
+    tier: flow
+    updatedAt: 2026-10-02T14:25:58.325Z
