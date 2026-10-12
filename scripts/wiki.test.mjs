@@ -30,7 +30,7 @@ const context = { topology, contracts, alerts, descriptions, repositories, footp
 const home = (repo) => repoPages({ repo, ...context })['Home.md'];
 
 describe('a repository wiki home page', () => {
-  it('opens with the repository description exactly as GitHub holds it', () => {
+  it('opens with the repository description from GitHub', () => {
     assert.match(home('tarot'), /^# tarot\n\nThe write side\./);
   });
 
