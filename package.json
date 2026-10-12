@@ -11,7 +11,8 @@
     "validate:contract": "node scripts/validate-contract.mjs",
     "validate:integration": "node scripts/validate-integration.mjs",
     "test": "node --test scripts/*.test.mjs",
-    "graph": "node scripts/dependency-graph.mjs"
+    "graph": "node scripts/dependency-graph.mjs",
+    "wiki": "node scripts/wiki.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.1"
