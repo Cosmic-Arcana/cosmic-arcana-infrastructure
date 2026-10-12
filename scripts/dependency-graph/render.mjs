@@ -25,9 +25,11 @@ export const renderTopology = ({ nodes, edges }) =>
 
 export const renderContracts = (edges) => {
   const targets = [...new Set(edges.map((edge) => edge.to))].sort();
+  const consumers = [...new Set(edges.map((edge) => edge.from))].filter((id) => !targets.includes(id)).sort();
   return [
     'flowchart LR',
     ...targets.map((id) => `  ${mermaidId(id)}[${id}]:::contract`),
+    ...consumers.map((id) => `  ${mermaidId(id)}[${id}]`),
     ...edges.map((edge) => {
       const arrow = edge.scope === 'runtime' ? '-->' : '-.->';
       return `  ${mermaidId(edge.from)} ${arrow}|${edge.range}| ${mermaidId(edge.to)}`;

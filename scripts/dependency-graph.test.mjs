@@ -225,6 +225,19 @@ describe('rendering', () => {
     assert.match(text, /tarot -->\|\^0\.1\.0\| cosmic_arcana_sdk/);
   });
 
+  it('shows the real repository name on every box, not the id Mermaid needs', () => {
+    const text = renderContracts([{ from: 'tarot-service-api', to: 'cosmic-arcana-sdk', range: '^0.1.0', scope: 'runtime' }]);
+
+    assert.match(text, /tarot_service_api\[tarot-service-api\]/);
+    assert.match(text, /cosmic_arcana_sdk\[cosmic-arcana-sdk\]:::contract/);
+  });
+
+  it('draws a build-only dependency dashed', () => {
+    const text = renderContracts([{ from: 'web', to: 'cosmic-arcana-sdk', range: '^0.1.0', scope: 'dev' }]);
+
+    assert.match(text, /web -\.->\|\^0\.1\.0\| cosmic_arcana_sdk/);
+  });
+
   it('writes a whole document that says it is generated and how to regenerate it', () => {
     const doc = renderDocument({
       topology,
