@@ -10,7 +10,8 @@
     "validate:health": "node scripts/validate-health.mjs",
     "validate:contract": "node scripts/validate-contract.mjs",
     "validate:integration": "node scripts/validate-integration.mjs",
-    "test": "node --test scripts/*.test.mjs"
+    "test": "node --test scripts/*.test.mjs",
+    "graph": "node scripts/dependency-graph.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.1"
