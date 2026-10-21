@@ -74,6 +74,24 @@ docker compose -f compose/application.yml --env-file compose/.env down -v
 3. The candidate manifest gains the service; the next validation starts it.
 4. If it is `tier: flow`, add its endpoint to `scripts/lib.mjs` and its wiring to
    `compose/application.yml`.
+5. Add `nginx/conf.d/<name>.conf` (copy `tarot.conf`); a test fails until its upstream matches the
+   compose port.
+
+## Edge (nginx)
+
+`compose/edge.yml` puts one nginx in front of the application; its configuration is `nginx/`, one file
+per service in `nginx/conf.d`. The storefront is the BFF, so it is the only public route (`:8080`),
+plus `/live`, the one tarot socket a browser opens. Every backend is reachable by name on a
+loopback-only listener (`:8081`) for operators, and loses its published port.
+
+```bash
+docker compose -f compose/application.yml -f compose/edge.yml up -d --wait
+curl -H 'Host: tarot.localhost' http://127.0.0.1:8081/health/ready
+```
+
+What it decides: the client address is the edge's own view, never the client's `X-Forwarded-For`; the
+request body is capped at 64k; access logs are one JSON line with the shared fields. What it does
+not: TLS (the deploy target is open) and rate limiting (the BFF owns that).
 
 ## Browser e2e
 
