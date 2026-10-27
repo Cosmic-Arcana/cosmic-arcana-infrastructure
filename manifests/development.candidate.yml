@@ -1,6 +1,6 @@
 version: 1
 channel: development
-generatedAt: 2026-10-27T21:29:37.511Z
+generatedAt: 2026-10-27T21:30:22.215Z
 validatedBy: null
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
@@ -40,3 +40,10 @@ services:
     commit: 56c2dd235a391b7bf5b40ff796d127b6340190f8
     tier: flow
     updatedAt: 2026-10-27T21:29:37.511Z
+  nasa-service-api:
+    repository: Cosmic-Arcana/nasa-service-api
+    image: ghcr.io/cosmic-arcana/nasa-service-api
+    digest: sha256:ca3c5bd5a7ba7ec799d713b28d848f76a338a18ca8444292d2521aeadbc74b4d
+    commit: 72a5f1503c291a17c6c01ad02488db8297950532
+    tier: liveness
+    updatedAt: 2026-10-27T21:30:22.215Z
