@@ -1,7 +1,7 @@
 version: 1
 channel: development
-generatedAt: 2026-10-27T20:26:18.394Z
-validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/40578063965
+generatedAt: 2026-10-27T21:30:22.215Z
+validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/40587360325
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
 services:
@@ -36,8 +36,15 @@ services:
   cosmic-arcana-storefront:
     repository: Cosmic-Arcana/cosmic-arcana-storefront
     image: ghcr.io/cosmic-arcana/cosmic-arcana-storefront
-    digest: sha256:7adfc3182b67f0c94bf4c3a8efabd608a696724889e718ffeb15a497d122128d
-    commit: df6ff903863846b4bd58854ff94a1ca44b2f7df0
+    digest: sha256:4a425431a421e29189ec3532003c3cb03217f195255fe73d6efec3e786757034
+    commit: 56c2dd235a391b7bf5b40ff796d127b6340190f8
     tier: flow
-    updatedAt: 2026-10-27T20:26:18.394Z
-promotedAt: 2026-10-27T20:31:50.592Z
+    updatedAt: 2026-10-27T21:29:37.511Z
+  nasa-service-api:
+    repository: Cosmic-Arcana/nasa-service-api
+    image: ghcr.io/cosmic-arcana/nasa-service-api
+    digest: sha256:ca3c5bd5a7ba7ec799d713b28d848f76a338a18ca8444292d2521aeadbc74b4d
+    commit: 72a5f1503c291a17c6c01ad02488db8297950532
+    tier: liveness
+    updatedAt: 2026-10-27T21:30:22.215Z
+promotedAt: 2026-10-27T21:36:26.941Z
