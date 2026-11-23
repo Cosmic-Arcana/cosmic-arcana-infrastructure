@@ -1,6 +1,6 @@
 version: 1
 channel: development
-generatedAt: 2026-11-16T12:49:59.633Z
+generatedAt: 2026-11-23T14:36:02.761Z
 validatedBy: null
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
@@ -18,7 +18,7 @@ services:
     digest: sha256:04f7b578fafb7f83b9bfefa2516ac2cef715cd3591587b89958d000a2826f0fa
     commit: 225f17c8b47201a361fb606053a64fd133d05f7b
     tier: flow
-    updatedAt: 2026-11-16T12:46:09.657Z
+    updatedAt: 2026-11-23T14:36:02.761Z
   ai-service-api:
     repository: Cosmic-Arcana/ai-service-api
     image: ghcr.io/cosmic-arcana/ai-service-api
