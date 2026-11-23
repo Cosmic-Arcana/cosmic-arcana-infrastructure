@@ -1,7 +1,7 @@
 version: 1
 channel: development
-generatedAt: 2026-11-16T12:49:59.633Z
-validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/43870164068
+generatedAt: 2026-11-23T14:36:02.761Z
+validatedBy: https://github.com/Cosmic-Arcana/cosmic-arcana-infrastructure/actions/runs/45195969976
 contracts:
   "@cosmic-arcana/sdk": 0.1.1
 services:
@@ -18,7 +18,7 @@ services:
     digest: sha256:04f7b578fafb7f83b9bfefa2516ac2cef715cd3591587b89958d000a2826f0fa
     commit: 225f17c8b47201a361fb606053a64fd133d05f7b
     tier: flow
-    updatedAt: 2026-11-16T12:46:09.657Z
+    updatedAt: 2026-11-23T14:36:02.761Z
   ai-service-api:
     repository: Cosmic-Arcana/ai-service-api
     image: ghcr.io/cosmic-arcana/ai-service-api
@@ -47,4 +47,4 @@ services:
     commit: 72a5f1503c291a17c6c01ad02488db8297950532
     tier: liveness
     updatedAt: 2026-10-27T21:30:22.215Z
-promotedAt: 2026-11-16T12:56:16.096Z
+promotedAt: 2026-11-23T14:42:38.833Z
